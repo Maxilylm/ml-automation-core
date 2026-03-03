@@ -647,6 +647,15 @@ CRITICAL RULES — read these before writing any code:
    dashboard works even if model artifacts are missing.
 6. Every st.plotly_chart() call must use a figure created in the SAME scope.
 7. Use st.set_page_config(page_title="Data Dashboard", layout="wide") at the top.
+8. PLOTLY COLOR SAFETY: All color values MUST be valid CSS3 named colors, hex, or
+   rgb/rgba strings. ONLY use colors from the W3C CSS3 list (147 named colors):
+   e.g. "red", "green", "lightgray", "steelblue", "lightcoral", "tomato", "gold".
+   Valid formats: named ("lightcoral"), hex ("#FF6347"), rgb ("rgb(255,99,71)"),
+   rgba ("rgba(255,99,71,0.5)"). NEVER use: None, NaN, empty strings, variables
+   that might be None, or invented color names not in the CSS3 spec.
+   For go.Indicator gauge steps, always hardcode colors:
+   gauge=dict(steps=[dict(range=[0,50], color="lightcoral"), dict(range=[50,100], color="lightgreen")])
+   Reference: https://plotly.com/python/css-colors/
 
 DASHBOARD STRUCTURE:
 - Sidebar: filters derived from actual categorical columns in the dataset

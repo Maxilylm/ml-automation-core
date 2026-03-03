@@ -31,7 +31,84 @@ except SyntaxError as e:
 print('    Syntax OK')
 " || exit 1
 
-# 3. Check for unresolved placeholder strings like "{value}", "{count}", "{Project}"
+# 3. Validate all plotly color values (catches invalid names, bad hex, None, NaN, etc.)
+echo "  - Validating plotly color values..."
+python3 -c "
+import re, sys, ast
+
+with open('$DASHBOARD_PATH', 'r') as f:
+    source = f.read()
+
+# CSS named colors supported by plotly (W3C CSS3 specification, 147 colors)
+VALID_CSS_COLORS = {
+    'aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black',
+    'blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse',
+    'chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue',
+    'darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki',
+    'darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon',
+    'darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise',
+    'darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick',
+    'floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod',
+    'gray','green','greenyellow','grey','honeydew','hotpink','indianred','indigo',
+    'ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue',
+    'lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey',
+    'lightpink','lightsalmon','lightseagreen','lightskyblue','lightslategray',
+    'lightslategrey','lightsteelblue','lightyellow','lime','limegreen','linen','magenta',
+    'maroon','mediumaquamarine','mediumblue','mediumorchid','mediumpurple',
+    'mediumseagreen','mediumslateblue','mediumspringgreen','mediumturquoise',
+    'mediumvioletred','midnightblue','mintcream','mistyrose','moccasin','navajowhite',
+    'navy','oldlace','olive','olivedrab','orange','orangered','orchid',
+    'palegoldenrod','palegreen','paleturquoise','palevioletred','papayawhip',
+    'peachpuff','peru','pink','plum','powderblue','purple','rebeccapurple','red',
+    'rosybrown','royalblue','saddlebrown','salmon','sandybrown','seagreen','seashell',
+    'sienna','silver','skyblue','slateblue','slategray','slategrey','snow',
+    'springgreen','steelblue','tan','teal','thistle','tomato','turquoise','violet',
+    'wheat','white','whitesmoke','yellow','yellowgreen'
+}
+
+def is_valid_color(s):
+    \"\"\"Check if a string is a valid plotly color value.\"\"\"
+    s = s.strip().lower()
+    if s in VALID_CSS_COLORS:
+        return True
+    # hex: #RGB, #RRGGBB, #RRGGBBAA
+    if re.match(r'^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$', s):
+        return True
+    # rgb(r,g,b) or rgba(r,g,b,a)
+    if re.match(r'^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+\s*)?\)$', s):
+        return True
+    # hsla, hsva variants
+    if re.match(r'^hsla?\(\s*\d+\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+\s*)?\)$', s):
+        return True
+    return False
+
+# Find all color=<string_literal> assignments in source
+issues = []
+# Pattern: color= followed by a quoted string (single or double)
+for m in re.finditer(r'color\s*=\s*([\"\\'])(.*?)\1', source):
+    color_val = m.group(2)
+    if not is_valid_color(color_val):
+        lineno = source[:m.start()].count('\n') + 1
+        issues.append(f'Line {lineno}: color=\"{color_val}\" is not a valid plotly color')
+
+# Also catch color=None, color=NaN, color=\"\"
+for m in re.finditer(r'color\s*=\s*(None|float\([\"\\']nan[\"\\']\))', source):
+    lineno = source[:m.start()].count('\n') + 1
+    issues.append(f'Line {lineno}: color={m.group(1)} is invalid')
+
+if issues:
+    print('  - ERROR: Invalid plotly color values found:')
+    for issue in issues:
+        print(f'    {issue}')
+    print()
+    print('    Valid formats: CSS named colors (e.g. \"lightcoral\", \"steelblue\"),')
+    print('    hex (\"#FF0000\"), rgb (\"rgb(255,0,0)\"), rgba (\"rgba(255,0,0,0.5)\")')
+    print('    Full list: https://plotly.com/python/css-colors/')
+    sys.exit(1)
+print('    All color values valid')
+" || exit 1
+
+# 4. Check for unresolved placeholder strings like "{value}", "{count}", "{Project}"
 echo "  - Checking for unresolved placeholders..."
 python3 -c "
 import re, sys
@@ -46,7 +123,7 @@ if placeholders:
 print('    No placeholders found')
 " || exit 1
 
-# 4. Import-level check (catches NameError/ImportError, tolerates Streamlit runtime errors)
+# 5. Import-level check (catches NameError/ImportError, tolerates Streamlit runtime errors)
 echo "  - Running import-level validation..."
 python3 -c "
 import sys, types, importlib, importlib.util
@@ -97,18 +174,18 @@ finally:
 print('    Import-level check OK')
 " || exit 1
 
-# 5. Check for required Streamlit imports
+# 6. Check for required Streamlit imports
 echo "  - Checking Streamlit imports..."
 if ! grep -q "import streamlit" "$DASHBOARD_PATH"; then
     echo "  - WARNING: Missing 'import streamlit' statement"
 fi
 
-# 6. Check for page config (best practice)
+# 7. Check for page config (best practice)
 if ! grep -q "st.set_page_config" "$DASHBOARD_PATH"; then
     echo "  - TIP: Consider adding st.set_page_config() for better UX"
 fi
 
-# 7. Check for required components
+# 8. Check for required components
 echo "  - Checking dashboard components..."
 COMPONENTS=("st.title\|st.header" "st.metric\|st.dataframe" "st.plotly_chart\|st.pyplot\|st.altair_chart")
 for comp in "${COMPONENTS[@]}"; do
@@ -117,7 +194,7 @@ for comp in "${COMPONENTS[@]}"; do
     fi
 done
 
-# 8. Create requirements snippet for dashboard
+# 9. Create requirements snippet for dashboard
 if [ ! -f "dashboard/requirements.txt" ]; then
     echo "  - Generating dashboard requirements..."
     mkdir -p dashboard
@@ -130,7 +207,7 @@ EOF
     echo "    Created dashboard/requirements.txt"
 fi
 
-# 9. Create run script
+# 10. Create run script
 if [ ! -f "dashboard/run.sh" ]; then
     echo "  - Creating run script..."
     cat > dashboard/run.sh << 'EOF'
@@ -142,7 +219,7 @@ EOF
     echo "    Created dashboard/run.sh"
 fi
 
-# 10. Log completion
+# 11. Log completion
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Dashboard validated: $DASHBOARD_PATH" >> .claude/workflow.log 2>/dev/null || true
 
 echo "[Post-Dashboard Hook] Dashboard ready!"
