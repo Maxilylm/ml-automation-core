@@ -65,20 +65,21 @@ If ANY of these appear, route to mlops-engineer even if "set up", "deploy", "cre
 - "deploy" + "model" or "production" or "monitoring"
 - "set up" + "monitoring" or "retraining" or "pipeline" (infrastructure, not code)
 
+**Data investigation → `eda-analyst`:**
+If accuracy/performance degradation is mentioned with data context, route here FIRST:
+- "accuracy" + "dropped", "degraded", "data update", "data change"
+- "analyze data", "statistics", "explore", "data quality"
+
 **ML methodology → `ml-theory-advisor`:**
 If ANY of these appear, route to ml-theory-advisor:
 - "leakage", "overfitting", "underfitting", "regularization", "bias", "variance"
 - "validation strategy", "cross-validation design", "model selection theory"
-- "accuracy" + "dropped", "degraded", "data update", "train vs test"
+- "accuracy" + "train vs test", "architecture", "hyperparameters"
 
 **ML feature design → `feature-engineering-analyst`:**
 If "features" appears with data context, route here even if "add" or "create" also appear:
 - "features" + ("data", "dataset", "behavior", "customer", "signals", "columns")
 - "feature importance", "feature selection", "interaction terms", "lag features"
-
-**Data investigation → `eda-analyst`:**
-- "accuracy" + "dropped", "degraded", "after data update", "data change"
-- "analyze data", "statistics", "explore", "data quality"
 
 ### Priority 3: Review/analysis tasks → Analysts
 - "review PR", "merge", "approve" → `pr-approver`
@@ -112,8 +113,8 @@ When a keyword is ambiguous, use surrounding context:
 | "features" | + "data", "dataset", "behavior", "customer" (ML) | `feature-engineering-analyst` |
 | "model" | + "deploy", "serve", "monitor" | `mlops-engineer` |
 | "model" | + "overfitting", "leakage", "train vs test" | `ml-theory-advisor` |
-| "accuracy" | + "dropped", "data update", "data change" | `eda-analyst` |
-| "accuracy" | + "train vs test", "architecture", "hyperparameters" | `ml-theory-advisor` |
+| "accuracy" | + "dropped", "degraded", "data update", "data change" | `eda-analyst` |
+| "accuracy" | + "train vs test", "architecture", "hyperparameters", "overfitting" | `ml-theory-advisor` |
 
 ## Agent Report Bus (v1.2.0)
 
