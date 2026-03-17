@@ -4,7 +4,7 @@ End-to-end machine learning automation workflow for AI coding assistants. Takes 
 
 Supports **Claude Code**, **Cursor**, **Codex**, and **OpenCode**.
 
-## What's New in v1.5.0
+## What's New in v1.5 (v1.5.0 — v1.5.3)
 
 ### Evaluation Framework
 
@@ -30,15 +30,23 @@ python evals/eval_runner.py --compare 1 2
 
 Eval definitions are versioned in `evals/`. Iteration outputs are gitignored.
 
-### Routing Improvements
+### Routing Overhaul (33% → 100% accuracy)
 
-The assigner agent now handles ambiguous prompts with:
-- **Expanded implementation keywords**: optimize, refactor, debug, configure, set up, migrate
-- **Diagnostic language detection**: "wrong", "broken", "not working" → developer
-- **ML methodology keywords**: leakage, overfitting, regularization → ml-theory-advisor
-- **MLOps keywords**: retraining, drift, monitoring, serving → mlops-engineer
-- **Feature engineering keywords**: feature importance, interaction terms → feature-engineering-analyst
-- **Contextual disambiguation**: "pipeline" routes differently based on surrounding context
+The assigner agent was restructured with a 6-level priority system. Domain-specific compound rules now fire **before** generic implementation keywords, eliminating all misroutes:
+
+1. **Multi-agent coordination** → `orchestrator` (catches "coordinate the whole thing")
+2. **Domain-specific rules** → MLOps, ML theory, feature engineering, data investigation (catches "set up monitoring", "add features from customer data")
+3. **Review/analysis** → appropriate analyst
+4. **Diagnostic language** → `developer` (catches "something's wrong", "broken")
+5. **Implementation keywords** → `developer` (only if no higher-priority rule matched)
+6. **Fallback** → `orchestrator`
+
+Additional keyword coverage:
+- **Diagnostic language**: "wrong", "broken", "not working", "crash" → developer
+- **ML methodology**: leakage, overfitting, regularization → ml-theory-advisor
+- **MLOps**: retraining, drift, monitoring, serving → mlops-engineer
+- **Feature engineering**: feature importance, interaction terms + data context → feature-engineering-analyst
+- **Contextual disambiguation table** for ambiguous terms (pipeline, features, model, accuracy)
 
 ### Skill Quality Overhaul
 
@@ -48,6 +56,23 @@ All 12 SKILL.md files expanded from ~20 lines to ~50 lines with:
 - Agent coordination details
 - Flags and configuration options
 - Pointer to full command specification
+
+### EDA Improvements
+
+- Date range validation (catches future dates, impossibly old dates)
+- Categorical label consistency checks (case variants like "Active"/"ACTIVE", semantic aliases like "NY"/"New York")
+- Near-duplicate detection guidance (subset-based, not just exact row match)
+- Domain-invalid range detection (negative ages, negative prices)
+
+### Preprocessing Improvements
+
+- **Active leakage scan** (step 1b): Feature-target correlation >0.90 and feature-feature correlation >0.95 flagged before pipeline construction
+- Pipeline artifact saving with `joblib.dump`
+- Updated Data Leakage Prevention Checklist with correlation thresholds
+
+### Agent Description Trimming
+
+Agent YAML frontmatter descriptions reduced ~90% (1800-2640 chars → 121-265 chars). XML examples moved to markdown body. Reduces token usage during routing decisions.
 
 ### Bug Fixes
 
