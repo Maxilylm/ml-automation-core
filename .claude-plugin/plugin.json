@@ -1,6 +1,6 @@
 {
   "name": "ml-automation",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "End-to-end ML automation workflow for Claude Code. Includes 10 specialized agents with shared report bus, reflection gates, MLOps registry layer, iterative self-check loops, pre-stage reflection planning, lessons learned system, parallel execution groups, /status and /registry commands, reusable ML utilities, hooks for quality gates, and a built-in evaluation framework.",
   "author": {
     "name": "Maximo Lorenzo y Losada"
