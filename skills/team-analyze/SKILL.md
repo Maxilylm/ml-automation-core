@@ -31,3 +31,11 @@ After parallel analysis completes, a reflection gate validates feature engineeri
 ## MLOps Registry (v1.3.0)
 
 During analysis, eda-analyst generates a data fingerprint and feature-engineering-analyst registers features. Use `/registry` to inspect stored artifacts.
+
+## Self-Check (v1.4.0)
+
+After each analysis stage, validate outputs with `validate_stage_output()`. Load lessons from prior runs with `ml_utils.load_lessons()` to inform agent context.
+
+## Full Specification
+
+See `commands/team-analyze.md` for the complete analysis workflow, parallel execution configuration, and reflection gate details.

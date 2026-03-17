@@ -26,3 +26,24 @@ description: Perform exploratory data analysis on any dataset. Generates compreh
 Provide findings in clear sections with code cells, markdown explanations, and visualizations.
 
 After completing EDA, invoke the `ml-theory-advisor` agent to review findings for potential data leakage risks.
+
+## Report Bus Integration (v1.2.0)
+
+Write a structured EDA report for downstream agents:
+```python
+from ml_utils import save_agent_report
+save_agent_report("eda-analyst", {
+    "status": "completed",
+    "findings": {"rows": 500, "columns": 12, "quality_issues": 3, "key_patterns": [...]},
+    "recommendations": [{"text": "Impute Age column", "target_agent": "preprocessor"}],
+    "artifacts": [".claude/eda_report.json", "reports/figures/"]
+})
+```
+
+## Data Versioning (v1.3.0)
+
+Generate a data fingerprint and register in the data versions registry for reproducibility. Use `ml_utils.compute_data_fingerprint()` if available.
+
+## Full Specification
+
+See `commands/eda.md` for complete EDA workflow, visualization patterns, and ml_utils integration.

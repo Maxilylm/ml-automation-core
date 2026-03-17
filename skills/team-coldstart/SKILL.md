@@ -58,3 +58,15 @@ Convention-based MLOps registries track the full model lifecycle:
 | Model Registry | mlops-engineer | Stage 5c (Validation) |
 
 Stage 5c (MLOps Registry Validation) ensures all registries are complete and lineage is traceable from data to deployed model. Use `/registry` to inspect.
+
+## Self-Check Loops (v1.4.0)
+
+After each stage, run `validate_stage_output()` to verify outputs meet deterministic criteria. If validation fails, the stage re-runs with error context (max iterations configurable).
+
+## Lessons Learned (v1.4.0)
+
+Load lessons from previous workflow runs using `ml_utils.load_lessons()`. Pass relevant lessons to agents as context before each stage. After workflow completion, save new lessons for future runs.
+
+## Full Specification
+
+See `commands/team-coldstart.md` for the complete 9-stage workflow with parallel execution groups, reflection gate configuration, and stage-specific validation rules.

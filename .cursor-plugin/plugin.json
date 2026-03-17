@@ -1,7 +1,7 @@
 {
   "name": "ml-automation",
   "description": "End-to-end ML automation workflow: 10 specialized agents with shared report bus, reflection gates, MLOps registry layer, parallel execution groups, /status and /registry commands, and quality gate hooks",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "author": {
     "name": "Maximo Lorenzo y Losada"
   },
