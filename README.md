@@ -4,6 +4,61 @@ End-to-end machine learning automation workflow for AI coding assistants. Takes 
 
 Supports **Claude Code**, **Cursor**, **Codex**, and **OpenCode**.
 
+## What's New in v1.5.0
+
+### Evaluation Framework
+
+Built-in eval definitions for all 12 skills and agent routing, with a CLI runner for tracking quality across iterations:
+
+```bash
+# Initialize a new eval iteration
+python evals/eval_runner.py --init-iteration 1
+
+# Record results after running a skill against its eval prompt
+python evals/eval_runner.py --record eda sales-data-exploration sales-correlation pass
+
+# View pass/fail summary
+python evals/eval_runner.py --summary
+
+# Compare across iterations to catch regressions
+python evals/eval_runner.py --compare 1 2
+```
+
+**30 evals** with **78 assertions** covering:
+- All 12 skills (EDA, preprocess, train, evaluate, deploy, test, report, status, registry, team-coldstart, team-analyze, team-review)
+- 15 routing accuracy tests for the assigner agent
+
+Eval definitions are versioned in `evals/`. Iteration outputs are gitignored.
+
+### Routing Improvements
+
+The assigner agent now handles ambiguous prompts with:
+- **Expanded implementation keywords**: optimize, refactor, debug, configure, set up, migrate
+- **Diagnostic language detection**: "wrong", "broken", "not working" → developer
+- **ML methodology keywords**: leakage, overfitting, regularization → ml-theory-advisor
+- **MLOps keywords**: retraining, drift, monitoring, serving → mlops-engineer
+- **Feature engineering keywords**: feature importance, interaction terms → feature-engineering-analyst
+- **Contextual disambiguation**: "pipeline" routes differently based on surrounding context
+
+### Skill Quality Overhaul
+
+All 12 SKILL.md files expanded from ~20 lines to ~50 lines with:
+- Report Bus integration (v1.2.0)
+- Version feature awareness (v1.2-v1.4)
+- Agent coordination details
+- Flags and configuration options
+- Pointer to full command specification
+
+### Bug Fixes
+
+- Fix 6 phantom agent references (pr-reviewer, qa-test-agent, snowflake-engineer, data-steward, project-manager)
+- Remove `/report` "status" alias that conflicted with `/status`
+- Replace hardcoded OpenCode-only ml_utils paths with multi-platform discovery
+
+### Orchestrator Update
+
+Now aware of all 9 agents and all version features (v1.2.0 report bus, v1.2.1 reflection gates, v1.3.0 MLOps registry, v1.4.0 self-check loops and lessons learned).
+
 ## What's New in v1.4.0
 
 ### Iterative Self-Check Loops
