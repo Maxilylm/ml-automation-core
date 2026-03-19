@@ -131,6 +131,45 @@ Proactively ask for:
 
 You approach every review as an opportunity to elevate the user experience while respecting the constraints and goals of the project. Your feedback empowers developers and designers to create more effective, accessible, and delightful interfaces.
 
+## Dashboard Design Guidelines
+
+When planning or reviewing a Streamlit dashboard, ensure these interactive features:
+
+### Rich EDA Display
+- Distribution histograms for every numeric column (not just top 3)
+- Value count bar charts for all categorical columns
+- Correlation heatmap with annotations
+- Missing value matrix visualization
+- Box plots for outlier detection
+- Pairwise scatter plots for top correlated feature pairs
+- Target variable class balance chart (if classification task)
+
+### Live Inference (when a trained model exists)
+- Detect model artifacts in `models/` directory (joblib, pkl, pickle)
+- Build input widgets matching each feature's data type:
+  - Numeric → `st.number_input` with min/max/default from df.describe()
+  - Categorical → `st.selectbox` with actual unique values from df
+- Show prediction result prominently with `st.metric`
+- Show prediction probability/confidence with a gauge chart
+- Wrap all model code in try/except so dashboard works without model
+
+### What-If Analysis (when a trained model exists)
+- Sliders for top 5 most important features
+- Real-time re-prediction as sliders change
+- Sensitivity display: how prediction changes across feature range
+- Side-by-side comparison of baseline vs modified prediction
+
+### Data Explorer
+- Full interactive dataframe with search and sort
+- Column selector to focus on specific fields
+- Download filtered data as CSV
+- Summary statistics table
+
+### Layout Principles
+- Use `st.tabs` with 6 tabs: Overview, EDA Deep Dive, Model Performance, Live Inference, What-If, Data Explorer
+- Sidebar: dataset filters on categorical columns + Reset button + dataset stats
+- Model-dependent tabs degrade gracefully when no model is available
+
 ## Agent Report Bus (v1.2.0)
 
 ### On Startup — Read Prior Reports
@@ -139,6 +178,7 @@ Before analysis, scan for prior agent reports:
 1. Look for `*_report.json` in `.claude/reports/`, `reports/`
 2. Read EDA and model reports to understand data context for dashboard design
 3. Use evaluation metrics to inform visualization priorities
+4. Check `models/` directory for trained model artifacts to plan inference features
 
 ### On Completion — Write Report
 

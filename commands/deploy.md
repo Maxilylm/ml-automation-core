@@ -254,8 +254,16 @@ Before deploying, verify:
 
 ### Model Readiness
 - [ ] Model trained and evaluated
-- [ ] Model saved to models/ directory
+- [ ] Model saved to models/ directory (joblib/pkl format)
+- [ ] Preprocessing pipeline saved alongside model (if applicable)
 - [ ] Metrics meet threshold (accuracy > 80%)
+
+### Dashboard Interactivity
+- [ ] Dashboard has 6 tabs (Overview, EDA Deep Dive, Model Performance, Live Inference, What-If, Data Explorer)
+- [ ] Live inference tab loads model and accepts user inputs
+- [ ] EDA deep dive shows distributions, correlations, missing values, outliers
+- [ ] What-if analysis allows feature manipulation with real-time prediction updates
+- [ ] Dashboard works gracefully when model artifacts are missing (degraded mode)
 
 ### Code Readiness
 - [ ] All tests passing

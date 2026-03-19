@@ -253,9 +253,15 @@ Spawn ALL THREE agents concurrently using multiple Task tool calls in a single m
 
 4. **frontend-ux-analyst** - Dashboard Planning
    ```
-   Review the EDA findings for {data_path} to plan dashboard visualizations.
+   Review the EDA findings for {data_path} to plan an interactive dashboard with live inference.
    FIRST: Read .claude/reports/eda-analyst_report.json for data context.
-   Recommend dashboard layout, key visualizations, and interactive features.
+   ALSO: Check if model artifacts exist in models/ directory (joblib/pickle files).
+   Plan dashboard with these priorities:
+   1. Rich EDA exploration: distributions, correlations, missing value patterns, outlier detection
+   2. If a model exists: live inference tab where users input feature values and get real-time predictions
+   3. What-if analysis: sliders/inputs to tweak features and see prediction changes
+   4. Segment comparison: filter by categorical groups and compare distributions/outcomes
+   Recommend dashboard layout, key visualizations, widget types, and interaction flows.
    WHEN DONE: Write your report using save_agent_report("frontend-ux-analyst", {...})
    Output: Dashboard design recommendations + agent bus report
    ```
@@ -642,6 +648,7 @@ CRITICAL RULES — read these before writing any code:
    - .claude/reports/ml-theory-advisor_report.json — methodology notes
    - .claude/reports/frontend-ux-analyst_report.json — dashboard design recommendations
    - Any model evaluation reports in reports/ directory
+   - Check models/ directory for trained model artifacts (*.joblib, *.pkl, *.pickle)
 4. Load data with pd.read_csv() and compute metrics at runtime — do NOT hardcode stats.
 5. Wrap model-specific sections in try/except or os.path.exists() checks so the
    dashboard works even if model artifacts are missing.
@@ -657,12 +664,45 @@ CRITICAL RULES — read these before writing any code:
    gauge=dict(steps=[dict(range=[0,50], color="lightcoral"), dict(range=[50,100], color="lightgreen")])
    Reference: https://plotly.com/python/css-colors/
 
-DASHBOARD STRUCTURE:
-- Sidebar: filters derived from actual categorical columns in the dataset
-- Tab 1 (Overview): KPI metrics computed from df at runtime, summary charts
-- Tab 2 (Analysis): Distribution and correlation charts built from df
-- Tab 3 (Results): Model performance or key insights (conditional on mode)
-- Tab 4 (Interactive): Predictions form or data explorer
+MODEL LOADING FOR LIVE INFERENCE:
+9. Search for model artifacts: glob("models/*.joblib") + glob("models/*.pkl") + glob("models/*.pickle")
+10. If a model artifact exists, load it with joblib.load() or pickle.load() in a try/except.
+11. Also search for preprocessing pipeline artifacts (e.g. models/*pipeline*, models/*scaler*, models/*encoder*).
+12. Store model availability in a boolean: HAS_MODEL = model is not None
+13. Read feature names from the training report or model artifact (model.feature_names_in_ for sklearn).
+14. For live inference: build input widgets matching each feature's type (st.number_input for numeric,
+    st.selectbox for categorical with actual unique values from the dataset).
+15. Show prediction result with confidence/probability when available (model.predict_proba).
+
+DASHBOARD STRUCTURE (6 tabs):
+- Sidebar: filters derived from actual categorical columns in the dataset.
+  Include a "Reset Filters" button. Show dataset stats (row count, column count) in sidebar.
+- Tab 1 (Overview): KPI metrics computed from df at runtime, summary charts, data quality gauge
+- Tab 2 (EDA Deep Dive): ALL of these — distribution histograms for every numeric column,
+  value counts bar charts for categoricals, correlation heatmap, missing value matrix,
+  box plots for outlier detection, pairwise scatter plots for top correlated features,
+  target variable analysis (class balance bar chart if classification)
+- Tab 3 (Model Performance): If HAS_MODEL — confusion matrix heatmap, ROC curve, precision-recall
+  curve, feature importance bar chart, model comparison table (if multiple models evaluated).
+  If no model — show "No model trained yet" message with recommendations from theory advisor.
+- Tab 4 (Live Inference): If HAS_MODEL — build a form with one widget per feature:
+  * Numeric features: st.number_input with min/max/default from df.describe()
+  * Categorical features: st.selectbox with actual unique values from df
+  * Add "Predict" button. On click: preprocess inputs (apply same pipeline if available),
+    run model.predict() and model.predict_proba(), display result prominently with
+    st.metric for prediction and a gauge chart for confidence.
+  * Show top feature contributions for this prediction if possible (use permutation importance
+    or coefficient weights as approximation).
+  If no model — show data explorer: column selector + filtered dataframe + download CSV button.
+- Tab 5 (What-If Analysis): If HAS_MODEL — show sliders for top 5 most important features.
+  As user adjusts sliders, re-run prediction in real-time. Display:
+  * Current prediction + probability
+  * A line/bar chart showing how the prediction changes as each feature varies across its range
+  * Sensitivity table: for each feature, show prediction at min/25th/median/75th/max
+  If no model — show segment comparison: pick a categorical column, compare distributions of
+  numeric columns across segments with grouped box plots.
+- Tab 6 (Data Explorer): Interactive data table with column search, sorting, download.
+  Summary statistics table. Ability to filter rows by any column value.
 
 Output: dashboard/app.py with all variables defined and no placeholders.
 ```
@@ -745,11 +785,13 @@ If still failing after max_iterations:
 
 - Dashboard created: dashboard/app.py
 - Smoke test: PASSED (iteration {n})
-- Components: Overview, Analysis, Results, Interactive
+- Tabs: Overview, EDA Deep Dive, Model Performance, Live Inference, What-If Analysis, Data Explorer
+- Live inference: {enabled/disabled based on model availability}
 - All variables grounded — no placeholders
 
 ### To Run Dashboard:
 ```bash
+pip install -r dashboard/requirements.txt
 streamlit run dashboard/app.py
 ```
 

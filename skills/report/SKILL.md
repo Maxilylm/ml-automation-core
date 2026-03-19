@@ -19,7 +19,7 @@ description: Generate reports and dashboards for ML/data science projects. Suppo
 | Model | `/report model` | Metrics, confusion matrix, ROC, feature importance, comparisons |
 | Drift | `/report drift` | Feature drift tests, distribution shifts, recommended actions |
 | Project | `/report project` | Pipeline status, code quality, PR summary, artifacts |
-| Metrics | `/report metrics` | Interactive HTML dashboard with charts |
+| Metrics | `/report metrics` | Interactive HTML dashboard with charts, live inference, and EDA visualizations |
 
 ## Workflow
 

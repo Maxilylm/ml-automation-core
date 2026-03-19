@@ -23,10 +23,11 @@ description: Deploy applications, dashboards, and models to various targets incl
 ## Workflow
 
 1. **Validate requirements** — Check model artifact exists, dependencies resolved
-2. **Package application** — Build Docker image or package for target
-3. **Configure environment** — Set env vars, secrets, connection strings
-4. **Deploy and verify** — Deploy to target, check health endpoints
-5. **Set up monitoring** — Logging, alerting, performance dashboards
+2. **Verify dashboard interactivity** — Ensure dashboard has live inference (if model exists), EDA deep dive, and what-if analysis tabs
+3. **Package application** — Build Docker image or package for target
+4. **Configure environment** — Set env vars, secrets, connection strings
+5. **Deploy and verify** — Deploy to target, check health endpoints, test live inference endpoint
+6. **Set up monitoring** — Logging, alerting, performance dashboards
 
 ## Agent Coordination
 

@@ -1241,8 +1241,10 @@ def _validate_dashboard_output(context):
     """Validate dashboard output (supplements the post-dashboard hook)."""
     import ast
     import re
+    import glob as globmod
 
     errors = []
+    warnings = []
     dashboard_path = context.get("dashboard_path", "dashboard/app.py")
 
     if not os.path.exists(dashboard_path):
@@ -1261,7 +1263,43 @@ def _validate_dashboard_output(context):
     if placeholders:
         errors.append(f"Unresolved placeholders: {placeholders}")
 
-    return len(errors) == 0, errors
+    # Check for interactive features
+    has_tabs = "st.tabs" in source
+    has_model_loading = "joblib.load" in source or "pickle.load" in source
+    has_inference = "predict(" in source or "predict_proba" in source
+    has_input_widgets = any(
+        w in source
+        for w in ["st.number_input", "st.selectbox", "st.slider", "st.form"]
+    )
+
+    # Check if model artifacts exist — if so, dashboard should support inference
+    model_files = (
+        globmod.glob("models/*.joblib")
+        + globmod.glob("models/*.pkl")
+        + globmod.glob("models/*.pickle")
+    )
+    if model_files and not has_model_loading:
+        warnings.append(
+            "Model artifacts found but dashboard has no model loading — "
+            "consider adding live inference"
+        )
+    if has_model_loading and not has_inference:
+        warnings.append("Model is loaded but no predict() calls found")
+    if has_model_loading and not has_input_widgets:
+        warnings.append(
+            "Model loaded but no input widgets (st.number_input, st.selectbox) "
+            "for live inference"
+        )
+    if not has_tabs:
+        warnings.append("Dashboard should use st.tabs for organized layout")
+
+    # Attach warnings to errors list prefixed so callers can distinguish
+    for w in warnings:
+        errors.append(f"WARNING: {w}")
+
+    # Only hard-fail on actual errors, not warnings
+    hard_errors = [e for e in errors if not e.startswith("WARNING:")]
+    return len(hard_errors) == 0, errors
 
 
 # =============================================================================

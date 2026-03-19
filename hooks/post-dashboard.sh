@@ -194,6 +194,25 @@ for comp in "${COMPONENTS[@]}"; do
     fi
 done
 
+# 8b. Check for interactive features (live inference, what-if)
+echo "  - Checking interactive features..."
+if grep -q "st.tabs" "$DASHBOARD_PATH"; then
+    TAB_COUNT=$(grep -o "st.tabs" "$DASHBOARD_PATH" | wc -l | tr -d ' ')
+    echo "    Tab layout: found ($TAB_COUNT st.tabs call(s))"
+fi
+if grep -qE "joblib\.load\|pickle\.load" "$DASHBOARD_PATH"; then
+    echo "    Live inference: model loading detected"
+fi
+if grep -qE "predict_proba\|predict\(" "$DASHBOARD_PATH"; then
+    echo "    Live inference: prediction calls detected"
+fi
+if grep -qE "st\.number_input\|st\.selectbox\|st\.slider" "$DASHBOARD_PATH"; then
+    echo "    Interactive widgets: input widgets detected"
+fi
+if grep -qE "st\.form\|st\.form_submit_button" "$DASHBOARD_PATH"; then
+    echo "    Form submission: form pattern detected"
+fi
+
 # 9. Create requirements snippet for dashboard
 if [ ! -f "dashboard/requirements.txt" ]; then
     echo "  - Generating dashboard requirements..."
@@ -203,6 +222,8 @@ streamlit>=1.28.0
 pandas>=2.0.0
 plotly>=5.18.0
 numpy>=1.24.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
 EOF
     echo "    Created dashboard/requirements.txt"
 fi

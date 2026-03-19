@@ -257,9 +257,20 @@ The `/report` command generates:
 - Performance trends
 - Prediction distribution
 - Latency charts
+- EDA deep dive (distributions, correlations, missing values, outlier detection)
+- Live inference panel (if model artifacts exist in models/ directory)
+- What-if analysis (feature sensitivity for trained models)
 
 **Output:**
 Interactive HTML dashboard saved to reports/metrics.html
+
+**Interactive Features:**
+- If model artifacts are found (`models/*.joblib`, `models/*.pkl`):
+  - Input form with widgets matching each feature's type
+  - Real-time prediction with confidence/probability display
+  - Feature sensitivity sliders for what-if analysis
+- EDA section always included with full distribution and correlation analysis
+- Data explorer with filtering, sorting, and CSV download
 
 ## Configuration Options
 
