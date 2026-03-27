@@ -1,7 +1,7 @@
 # Modular Extension Architecture Design
 
 **Date:** 2026-03-27
-**Status:** Approved
+**Status:** Draft
 **Branch:** `feature/modular-extension-architecture`
 
 ## Problem
@@ -61,21 +61,18 @@ description: End-to-end Media Mix Modeling workflow
 user_invocable: true
 aliases: [mmm, media-mix]
 extends: ml-automation
-uses_core_agents: [eda-analyst, developer, mlops-engineer]
 ---
 ```
 
 **Fields:**
 
 - `extends: ml-automation` — same protocol field as agents
-- `uses_core_agents` — documentation-only list of core agents this skill depends on
 
 ### Rules
 
 - `extends: ml-automation` is required for the core to recognize an extension component
 - `routing_keywords` feeds the assigner's dynamic routing
 - `hooks_into` must reference valid hook point names defined by the core (see Section 2)
-- `uses_core_agents` is not enforced at runtime
 - Core agents do not need any frontmatter changes
 
 ## Section 2: Core Hook Points
@@ -87,8 +84,8 @@ Named stage boundaries in core workflows where extension agents can inject execu
 | Hook Point | Fires After | Before | Purpose |
 |---|---|---|---|
 | `after-init` | Stage 1: Initialize | Stage 2: Analysis | Post-setup, data validated |
-| `after-eda` | Stage 2: EDA + Analysis | Stage 3: Processing | Data understood, pre-processing |
-| `after-feature-engineering` | Feature engineering complete | Preprocessing | Features designed, before pipeline |
+| `after-eda` | Stage 2: EDA + Analysis (after reflection gate 1) | Stage 3: Processing | Data understood, reflection gate passed, pre-processing |
+| `after-feature-engineering` | Feature engineering complete (after reflection gate if applicable) | Preprocessing | Features designed, before pipeline |
 | `after-preprocessing` | Stage 3: Processing | Stage 4: Modeling | Clean data ready |
 | `before-training` | Pre-stage reflection | Training execution | Last chance to influence model strategy |
 | `after-training` | Stage 4: Modeling | Stage 5: Evaluation | Model trained, pre-evaluation |
@@ -107,15 +104,20 @@ Named stage boundaries in core workflows where extension agents can inject execu
 | `/deploy` | `before-deploy`, `after-deploy` |
 | `/preprocess` | `after-preprocessing` |
 
+### Hook Point Timing Rule
+
+All `after-*` hook points fire **after** any reflection gates associated with that stage have passed. Extension agents receive the final, gate-approved output — never intermediate pre-gate data.
+
 ### Hook Execution Contract
 
 When the core reaches a hook point:
 
 1. **Discover** — scan all installed plugin agent files for `hooks_into` containing this hook point
 2. **Collect** — gather all matching extension agents
-3. **Spawn sequentially** — run each extension agent, passing it the current report bus state (all prior `*_report.json` files)
+3. **Spawn sequentially** — run each extension agent, passing it the current report bus state (all prior `*_report.json` files). If multiple independent extensions hook into the same point, they may be spawned in parallel (same pattern as core parallel execution groups).
 4. **Extension agent writes its report** — using `save_agent_report()` convention, making its output available to downstream stages
-5. **Continue** — core proceeds to the next stage
+5. **On failure** — if an extension agent fails or produces no report, log a warning and continue the core workflow. Extension failures must not block core execution. The orchestrator should note the failure in its report for visibility.
+6. **Continue** — core proceeds to the next stage
 
 ### Versioning
 
@@ -125,24 +127,29 @@ Hook points are versioned with the core plugin version. Renaming or removing a h
 
 ### Discovery Mechanism
 
-1. Scan plugin directories for all `agents/*.md` files across installed plugins
+1. Scan plugin directories for all `agents/*.md` files. Claude Code loads plugins from:
+   - Project-local: `.claude/plugins/*/agents/*.md`
+   - User-global: `~/.claude/plugins/*/agents/*.md`
+   - The orchestrator/assigner use `Glob` with these paths to find all agent files.
 2. Parse YAML frontmatter — extract `name`, `extends`, `routing_keywords`, `hooks_into`
-3. Build runtime agent table — core agents + any agent with `extends: ml-automation`
+3. Filter — only include agents where `extends: ml-automation` is present
+4. **Validate hook points** — if an agent declares a `hooks_into` value that doesn't match any known hook point, log a warning (likely a typo). Known hook points are listed in the orchestrator's prompt.
+5. Build runtime agent table — core agents + validated extension agents
 
 This logic lives in the orchestrator and assigner agent prompts as instructions. These agents already use `Glob` and `Read` tools — they scan at workflow start.
 
 ### Assigner Changes
 
-Current assigner has 6 priority tiers of hardcoded rules. New behavior:
+Current assigner has 6 priority tiers (Priority 1: orchestrator for multi-agent tasks, Priority 2: domain-specific compound rules with sub-sections for MLOps/Data/ML-theory/Features, Priority 3: review tasks, Priority 4: diagnostic, Priority 5: implementation, Priority 6: fallback). New behavior:
 
-1. Read all `agents/*.md` from all installed plugins
+1. Read all `agents/*.md` from all installed plugins (using discovery paths above)
 2. Build routing table:
    - Core agents: use existing priority rules (unchanged)
    - Extension agents: match `routing_keywords` against ticket text
 3. Priority ordering:
    - Core priority tiers 1-6 remain unchanged
-   - Extension agents slot into a new **tier 3.5** (after domain-specific compound rules, before review tasks)
-   - If multiple extension agents match, prefer the one with more keyword matches
+   - Extension agents slot into a new **tier 2.5** (after domain-specific compound rules in Priority 2, before review tasks in Priority 3)
+   - If multiple extension agents match, prefer the one with the highest ratio of matched keywords to total keywords (specificity), not raw count
 4. Fallback remains: orchestrator
 
 Extension agents never override core routing. They fill gaps for domain-specific requests that no core agent handles.
@@ -240,6 +247,8 @@ def decompose_contributions(model, X):
 
 This works because the core's `ml_utils.py` is already copied into the user's project before any extension runs.
 
+**Important:** Extension commands that run standalone (outside a core workflow like `/team-coldstart`) must ensure `ml_utils.py` exists in the project. Extension commands should include a Stage 0 step: "If `ml_utils.py` is not present in the project, copy it from the core plugin's `templates/` directory." The core's `ml_utils.py` path can be discovered by scanning plugin directories for `templates/ml_utils.py`.
+
 ## Section 5: Scope of Core Changes (This PR)
 
 ### Files to Modify
@@ -248,7 +257,7 @@ This works because the core's `ml_utils.py` is already copied into the user's pr
 2. **`agents/assigner.md`** — Add dynamic routing for extension agents via `routing_keywords`. Add priority tier 3.5.
 3. **`commands/team-coldstart.md`** — Insert hook point markers at all 10 stage boundaries with discovery and spawn instructions.
 4. **`commands/eda.md`**, **`train.md`**, **`evaluate.md`**, **`deploy.md`**, **`preprocess.md`** — Add relevant hook points.
-5. **`templates/ml_utils.py`** — Add `discover_extension_agents()` and `get_hooked_agents(hook_point)` helper functions.
+5. **`templates/ml_utils.py`** — No discovery functions added here (ml_utils is copied into user projects and should not contain plugin-internal scanning logic). Only change: ensure `save_agent_report()` and `load_agent_report()` work correctly with extension agent IDs (no hardcoded agent name lists).
 
 ### Files to Create
 
