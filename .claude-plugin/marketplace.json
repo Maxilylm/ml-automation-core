@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "ml-automation-marketplace",
-  "description": "End-to-end ML automation plugins for Claude Code",
+  "description": "End-to-end ML automation plugins for Claude Code — extensible plugin ecosystem",
   "owner": {
     "name": "Maximo Lorenzo y Losada",
     "email": ""
@@ -9,17 +9,32 @@
   "plugins": [
     {
       "name": "ml-automation",
-      "description": "End-to-end ML automation workflow with specialized agents, reusable ML utilities, and quality gates for EDA, feature engineering, training, evaluation, and deployment.",
-      "version": "1.7.0",
+      "description": "Core ML automation workflow with 10 specialized agents, Extension Protocol for plugin ecosystem, shared report bus, reflection gates, MLOps registry, and quality gates for EDA, feature engineering, training, evaluation, and deployment.",
+      "version": "1.8.0",
       "author": {
         "name": "Maximo Lorenzo y Losada"
       },
       "source": {
         "source": "url",
-        "url": "https://github.com/maxilylm/ml-automation-plugin.git"
+        "url": "https://github.com/Maxilylm/ml-automation-core.git"
       },
       "category": "development",
-      "homepage": "https://github.com/maxilylm/ml-automation-plugin"
+      "homepage": "https://github.com/Maxilylm/ml-automation-core"
+    },
+    {
+      "name": "ml-automation-mmm",
+      "description": "Media Mix Modeling extension for ml-automation. Bayesian MMM with adstock, saturation, channel attribution, and client-ready reporting. Hooks into core workflows at after-eda and after-evaluation.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Maximo Lorenzo y Losada"
+      },
+      "source": {
+        "source": "url",
+        "url": "https://github.com/Maxilylm/ml-automation-mmm.git"
+      },
+      "category": "development",
+      "homepage": "https://github.com/Maxilylm/ml-automation-mmm",
+      "dependencies": ["ml-automation>=1.8.0"]
     }
   ]
 }
