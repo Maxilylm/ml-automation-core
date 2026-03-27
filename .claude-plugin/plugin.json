@@ -1,7 +1,7 @@
 {
   "name": "ml-automation",
-  "version": "1.7.0",
-  "description": "End-to-end ML automation workflow for Claude Code. Includes 10 specialized agents with shared report bus, reflection gates, MLOps registry layer, iterative self-check loops, pre-stage reflection planning, lessons learned system, parallel execution groups, /status and /registry commands, reusable ML utilities, hooks for quality gates, and a built-in evaluation framework.",
+  "version": "1.8.0",
+  "description": "End-to-end ML automation workflow for Claude Code. Includes 10 specialized agents with shared report bus, reflection gates, MLOps registry layer, iterative self-check loops, pre-stage reflection planning, lessons learned system, parallel execution groups, traceability audit log, business plausibility checks, analytical methodology document generation, database connectors (Snowflake/PostgreSQL/BigQuery), feedback collection, reusable ML utilities, hooks for quality gates, and a built-in evaluation framework.",
   "author": {
     "name": "Maximo Lorenzo y Losada"
   },
@@ -22,6 +22,9 @@
     "parallel-agents",
     "iterative",
     "reflection",
-    "lessons-learned"
+    "lessons-learned",
+    "extensible",
+    "extension-protocol",
+    "plugin-ecosystem"
   ]
 }
