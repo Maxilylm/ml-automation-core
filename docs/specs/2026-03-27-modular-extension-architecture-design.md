@@ -254,7 +254,7 @@ This works because the core's `ml_utils.py` is already copied into the user's pr
 ### Files to Modify
 
 1. **`agents/orchestrator.md`** — Replace static agent table with dynamic discovery instructions. Add hook point execution logic.
-2. **`agents/assigner.md`** — Add dynamic routing for extension agents via `routing_keywords`. Add priority tier 3.5.
+2. **`agents/assigner.md`** — Add dynamic routing for extension agents via `routing_keywords`. Add priority tier 2.5.
 3. **`commands/team-coldstart.md`** — Insert hook point markers at all 10 stage boundaries with discovery and spawn instructions.
 4. **`commands/eda.md`**, **`train.md`**, **`evaluate.md`**, **`deploy.md`**, **`preprocess.md`** — Add relevant hook points.
 5. **`templates/ml_utils.py`** — No discovery functions added here (ml_utils is copied into user projects and should not contain plugin-internal scanning logic). Only change: ensure `save_agent_report()` and `load_agent_report()` work correctly with extension agent IDs (no hardcoded agent name lists).
