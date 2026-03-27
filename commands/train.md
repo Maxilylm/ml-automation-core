@@ -35,6 +35,14 @@ from src.ml_utils import (
 )
 ```
 
+### Extension Hook Point: before-training
+
+Scan for extension agents with `hooks_into` containing "before-training":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "before-training"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
+
 ### 1. Data Preparation
 - Load and validate the dataset
 - Separate features (X) from target (y)
@@ -84,6 +92,14 @@ cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy')
 - NO evaluation metrics on training data as final results
 - ALWAYS use pipelines to prevent data leakage
 - ALWAYS set random_state for reproducibility
+
+### Extension Hook Point: after-training
+
+Scan for extension agents with `hooks_into` containing "after-training":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "after-training"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
 
 ## Output
 

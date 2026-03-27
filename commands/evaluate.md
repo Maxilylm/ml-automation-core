@@ -61,6 +61,14 @@ PrecisionRecallDisplay.from_estimator(model, X_test, y_test)
 | Cost-Sensitive | Custom weighted metrics | Different error costs |
 | Regression | RMSE, MAE, R² | Continuous targets |
 
+### Extension Hook Point: after-evaluation
+
+Scan for extension agents with `hooks_into` containing "after-evaluation":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "after-evaluation"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
+
 ## Output Format
 
 Provide:

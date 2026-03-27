@@ -169,6 +169,14 @@ print(f"Pipeline saved to models/preprocessing_pipeline.joblib")
 - [ ] No target information in features
 - [ ] No future information in features (time series)
 
+### Extension Hook Point: after-preprocessing
+
+Scan for extension agents with `hooks_into` containing "after-preprocessing":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "after-preprocessing"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
+
 ## Output
 
 Provide:

@@ -248,6 +248,14 @@ Or use direct URL (if available in your Snowflake account).
 
 **Note:** This is a placeholder for GCP deployment. Full implementation requires GCP SDK setup.
 
+### Extension Hook Point: before-deploy
+
+Scan for extension agents with `hooks_into` containing "before-deploy":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "before-deploy"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
+
 ## Deployment Checklist
 
 Before deploying, verify:
@@ -301,6 +309,14 @@ SET DEFAULT VERSION = 'v_previous';
 -- Or delete problematic version
 DROP MODEL VERSION TITANIC_SURVIVAL_MODEL VERSION v_current;
 ```
+
+### Extension Hook Point: after-deploy
+
+Scan for extension agents with `hooks_into` containing "after-deploy":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "after-deploy"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
 
 ## Invoke Agents
 

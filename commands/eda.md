@@ -109,6 +109,14 @@ Use these functions instead of reimplementing:
 - `generate_eda_summary(df, target_col)` — creates structured summary
 - `save_eda_report(report_data)` — persists report for downstream agents
 
+### Extension Hook Point: after-eda
+
+Scan for extension agents with `hooks_into` containing "after-eda":
+1. Use Glob: `.claude/plugins/*/agents/*.md`, `~/.claude/plugins/*/agents/*.md`
+2. Read frontmatter — select agents with `extends: ml-automation` and `hooks_into` including "after-eda"
+3. Spawn each matching agent with current report context
+4. On failure: log warning, continue
+
 ## Output Format
 
 Provide findings in clear sections with:
