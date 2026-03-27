@@ -32,6 +32,39 @@ You don't write code directly. Instead, you:
 | `mlops-engineer` | Deployment, pipelines, MLOps registry |
 | `assigner` | Automatic ticket routing |
 
+### Extension Agent Discovery
+
+At workflow start, discover extension agents from all installed plugins:
+
+1. Use Glob to scan for agent files:
+   - `.claude/plugins/*/agents/*.md`
+   - `~/.claude/plugins/*/agents/*.md`
+2. Read each agent file's YAML frontmatter
+3. Include agents where `extends: ml-automation` is present
+4. Extract `routing_keywords` and `hooks_into` fields
+5. If a `hooks_into` value does not match a known hook point, log a warning:
+   "WARNING: Agent {name} declares unknown hook point '{value}' — skipping that hook"
+6. Merge discovered extension agents into the Available Agents table for this session
+
+Known hook points: `after-init`, `after-eda`, `after-feature-engineering`, `after-preprocessing`, `before-training`, `after-training`, `after-evaluation`, `after-dashboard`, `before-deploy`, `after-deploy`
+
+### Hook Point Execution
+
+When a workflow reaches a named hook point:
+
+1. Check discovered extension agents for `hooks_into` containing this hook point
+2. **Timing rule:** All `after-*` hook points fire AFTER any reflection gates for that stage have passed. Extension agents receive gate-approved output only — never intermediate pre-gate data.
+3. For each matching extension agent, spawn it with this context:
+   "You are running at hook point '{hook_point}' in the core ml-automation workflow.
+    Read all prior agent reports in .claude/reports/ for context.
+    WHEN DONE: Write your report using save_agent_report('{agent_name}', {...})"
+   If multiple independent extensions hook into the same point, they MAY be spawned in parallel (same pattern as core parallel execution groups).
+4. If an extension agent fails or produces no report, log a warning and continue:
+   "WARNING: Extension agent {name} failed at hook point {hook_point} — continuing workflow"
+5. Extension agent failures must NOT block the core workflow
+6. Record any extension failures in the orchestrator's own report under an `extension_failures` key for visibility
+7. After all hook point agents complete (or fail), proceed to the next stage
+
 ## How to Work with Tickets
 
 Use the ticket API to manage work:
