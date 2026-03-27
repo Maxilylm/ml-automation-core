@@ -8,32 +8,18 @@
   },
   "plugins": [
     {
-      "name": "ml-automation",
-      "description": "End-to-end ML automation workflow with specialized agents, reusable ML utilities, and quality gates for EDA, feature engineering, training, evaluation, and deployment.",
-      "version": "1.7.0",
-      "author": {
-        "name": "Maximo Lorenzo y Losada"
-      },
-      "source": {
-        "source": "url",
-        "url": "https://github.com/maxilylm/ml-automation-plugin.git"
-      },
-      "category": "development",
-      "homepage": "https://github.com/maxilylm/ml-automation-plugin"
-    },
-    {
       "name": "ml-automation-core",
-      "description": "Core ML automation plugin with Extension Protocol. 10 specialized agents, shared report bus, reflection gates, MLOps registry, hook points for extensions, and quality gates.",
+      "description": "End-to-end ML automation workflow with Extension Protocol. 10 specialized agents, shared report bus, reflection gates, MLOps registry, hook points for extensions, and quality gates.",
       "version": "1.8.0",
       "author": {
         "name": "Maximo Lorenzo y Losada"
       },
       "source": {
         "source": "url",
-        "url": "https://github.com/Maxilylm/ml-automation-core.git"
+        "url": "https://github.com/Maxilylm/ml-automation-plugin.git"
       },
       "category": "development",
-      "homepage": "https://github.com/Maxilylm/ml-automation-core"
+      "homepage": "https://github.com/Maxilylm/ml-automation-plugin"
     },
     {
       "name": "ml-automation-mmm",
