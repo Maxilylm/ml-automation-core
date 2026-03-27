@@ -88,6 +88,21 @@ Save your plan using save_stage_plan("{stage_name}", {...})
 | 6 (Dashboard) | frontend-ux-analyst |
 | 7 (Production) | mlops-engineer |
 
+### Extension Hook Point Template
+
+At each named hook point in the workflow:
+
+**Timing rule:** All `after-*` hook points fire AFTER reflection gates for that stage have passed. Extension agents receive gate-approved output only.
+
+1. Scan for extension agents: use Glob to find agents in `.claude/plugins/*/agents/*.md` and `~/.claude/plugins/*/agents/*.md`
+2. Read each agent's frontmatter — select those with `extends: ml-automation` and `hooks_into` containing the current hook point name
+3. For each matching agent, spawn it with (multiple independent extensions may run in parallel):
+   "You are running at hook point '{hook_point}' in the /team-coldstart workflow.
+    Read all prior agent reports in .claude/reports/ for context on the workflow state.
+    WHEN DONE: Write your report using save_agent_report('{your_agent_name}', {...})"
+4. If an extension agent fails or produces no report, log a warning and continue
+5. Proceed to the next stage after all hook point agents complete
+
 ### Self-Check Loop Template
 
 After each stage's agent completes (unless `--max-check 0`):
@@ -180,6 +195,10 @@ save_lesson({
 - Detected mode: ML (target: Revenue) OR Analysis (no target)
 - Quality check: PASSED (no critical issues)
 ```
+
+#### Hook Point: after-init
+
+Run the Extension Hook Point Template (above) with hook_point = "after-init".
 
 ### Stage 2: Analysis (Sequential → Parallel with Report Bus)
 
@@ -306,6 +325,10 @@ Run `validate_stage_output("feature-engineering")`. If validation fails, re-spaw
 - Dashboard Planning: {visualization_recommendations}
 ```
 
+#### Hook Point: after-feature-engineering
+
+Run the Extension Hook Point Template (above) with hook_point = "after-feature-engineering".
+
 ### Stage 2c: Gate 1 — Reflect on Feature Engineering (Reflection Loop)
 
 **Reflection gate** — validates feature engineering output before preprocessing proceeds.
@@ -348,6 +371,10 @@ max_iterations = {--max-reflect, default: 2}
 3. **If max iterations reached with verdict still "revise":**
    - Log warning: "Gate 1: Max reflection iterations reached, proceeding with best effort"
    - Proceed to Stage 3
+
+#### Hook Point: after-eda
+
+Run the Extension Hook Point Template (above) with hook_point = "after-eda".
 
 ### Stage 3: Data Processing
 
@@ -417,11 +444,19 @@ Same iteration loop pattern as Gate 1, but:
 - Reports to read: preprocessing report + feature-engineering report + EDA report
 - On revise: re-run Stage 3 (preprocessing) with corrections from reflection report
 
+#### Hook Point: after-preprocessing
+
+Run the Extension Hook Point Template (above) with hook_point = "after-preprocessing".
+
 ### Stage 4: Modeling / Insights Generation
 
 #### Stage 4 Pre-Reflection (unless --no-pre-reflect)
 
 Spawn **ml-theory-advisor** in pre-reflection mode for training. Reads all prior reports + lessons. Saves plan to `stage_plan_training.json`.
+
+#### Hook Point: before-training
+
+Run the Extension Hook Point Template (above) with hook_point = "before-training".
 
 **For ML Mode:**
 1. Train baseline model (appropriate for task type)
@@ -493,6 +528,10 @@ Same iteration loop pattern as Gate 1, but:
 - Reports to read: ALL prior reports + training report
 - On revise: re-run Stage 4 (training) with corrections from reflection report
 - Example: For MMM, might recommend Bayesian regression over gradient boosting
+
+#### Hook Point: after-training
+
+Run the Extension Hook Point Template (above) with hook_point = "after-training".
 
 ### Stage 5: Evaluation
 
@@ -625,6 +664,10 @@ After mlops-engineer returns, check that it wrote its report:
 3. After the retry, check again. If still missing, log a warning:
    "WARNING: mlops-engineer report missing after retry — proceeding without it."
 ```
+
+#### Hook Point: after-evaluation
+
+Run the Extension Hook Point Template (above) with hook_point = "after-evaluation".
 
 ### Stage 6: Streamlit Dashboard
 
@@ -799,6 +842,10 @@ Dashboard URL: http://localhost:8501
 PR #3: Merged ✓
 ```
 
+#### Hook Point: after-dashboard
+
+Run the Extension Hook Point Template (above) with hook_point = "after-dashboard".
+
 ### Stage 7: Productionalization
 
 #### Stage 7 Pre-Reflection (unless --no-pre-reflect)
@@ -833,6 +880,10 @@ Spawn **mlops-engineer** in pre-reflection mode for production. Reads all prior 
 - Production checklist: PASSED
 ```
 
+#### Hook Point: before-deploy
+
+Run the Extension Hook Point Template (above) with hook_point = "before-deploy".
+
 ### Stage 8: Deployment (Optional)
 
 **If deployment requested:**
@@ -855,6 +906,10 @@ Spawn **mlops-engineer** in pre-reflection mode for production. Reads all prior 
 - Dashboard deployed: http://localhost:8501
 - Health check: PASSED
 ```
+
+#### Hook Point: after-deploy
+
+Run the Extension Hook Point Template (above) with hook_point = "after-deploy".
 
 ### Stage 9: Finalization
 
