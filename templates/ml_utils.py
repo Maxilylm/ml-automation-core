@@ -433,11 +433,15 @@ def get_workflow_status(search_dirs=None):
     """
     reports = load_agent_reports(search_dirs)
 
-    workflow_agents = [
+    # Build agent list dynamically from existing reports + known core agents
+    core_agents = [
         "eda-analyst", "feature-engineering-analyst", "ml-theory-advisor",
         "frontend-ux-analyst", "developer", "brutal-code-reviewer",
         "pr-approver", "mlops-engineer", "orchestrator", "assigner",
     ]
+    # Include any agent that has written a report (catches extension agents)
+    discovered_agents = set(core_agents) | set(reports.keys())
+    workflow_agents = sorted(discovered_agents)
 
     completed = []
     for agent_name, report in reports.items():
@@ -1368,3 +1372,573 @@ def load_stage_plan(stage, search_dirs=None):
                 continue
 
     return None
+
+
+# =============================================================================
+# 13. TRACEABILITY LOG (Audit System)
+# =============================================================================
+
+TRACEABILITY_FILENAME = "traceability-log.jsonl"
+
+PLATFORM_TRACE_DIRS = [
+    ".claude",
+    ".cursor",
+    ".codex",
+    ".opencode",
+]
+
+
+def log_trace_event(event_data, output_dirs=None):
+    """
+    Append a trace event to the traceability log (JSONL format).
+
+    Args:
+        event_data: Dict with keys:
+            - event_type: 'agent_spawn' | 'agent_complete' | 'stage_start' | 'stage_end'
+                          | 'decision' | 'reflection' | 'validation' | 'error' | 'user_action'
+            - agent: Agent name (if applicable)
+            - action: Brief description of what was done
+            - details: Dict with event-specific data
+            - inputs_summary: What the agent/action received
+            - outputs_summary: What was produced
+            - duration_ms: Execution time in milliseconds (if known)
+            - stage: Pipeline stage name (if applicable)
+            - command: Originating command (e.g., 'team-coldstart')
+    """
+    from datetime import datetime, timezone
+
+    if output_dirs is None:
+        output_dirs = PLATFORM_TRACE_DIRS
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "event_type": event_data.get("event_type", "unknown"),
+        "agent": event_data.get("agent", ""),
+        "action": event_data.get("action", ""),
+        "details": event_data.get("details", {}),
+        "inputs_summary": event_data.get("inputs_summary", ""),
+        "outputs_summary": event_data.get("outputs_summary", ""),
+        "duration_ms": event_data.get("duration_ms"),
+        "stage": event_data.get("stage", ""),
+        "command": event_data.get("command", ""),
+    }
+
+    line = json.dumps(entry, default=str)
+
+    for d in output_dirs:
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, TRACEABILITY_FILENAME)
+        with open(path, "a") as f:
+            f.write(line + "\n")
+
+
+def load_trace_log(search_dirs=None, filters=None):
+    """
+    Load and optionally filter the traceability log.
+
+    Args:
+        search_dirs: Directories to search (defaults to PLATFORM_TRACE_DIRS)
+        filters: Optional dict with filter keys:
+            - event_type: str or list of event types
+            - agent: str agent name
+            - stage: str stage name
+            - command: str command name
+            - since: ISO timestamp string — only events after this time
+            - limit: int max entries to return (most recent first)
+
+    Returns:
+        List of trace event dicts, newest first.
+    """
+    if search_dirs is None:
+        search_dirs = PLATFORM_TRACE_DIRS
+
+    if filters is None:
+        filters = {}
+
+    entries = []
+    seen_timestamps = set()
+
+    for d in search_dirs:
+        path = os.path.join(d, TRACEABILITY_FILENAME)
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                            ts = entry.get("timestamp", "")
+                            key = f"{ts}_{entry.get('event_type', '')}_{entry.get('agent', '')}"
+                            if key not in seen_timestamps:
+                                seen_timestamps.add(key)
+                                entries.append(entry)
+                        except json.JSONDecodeError:
+                            continue
+            except OSError:
+                continue
+
+    # Apply filters
+    event_type_filter = filters.get("event_type")
+    if event_type_filter:
+        if isinstance(event_type_filter, str):
+            event_type_filter = [event_type_filter]
+        entries = [e for e in entries if e.get("event_type") in event_type_filter]
+
+    for key in ("agent", "stage", "command"):
+        val = filters.get(key)
+        if val:
+            entries = [e for e in entries if e.get(key) == val]
+
+    since = filters.get("since")
+    if since:
+        entries = [e for e in entries if e.get("timestamp", "") >= since]
+
+    # Sort newest first
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+
+    limit = filters.get("limit")
+    if limit:
+        entries = entries[:limit]
+
+    return entries
+
+
+def format_trace_log(entries, verbose=False):
+    """Format trace log entries for display."""
+    if not entries:
+        return "No trace events found."
+
+    lines = [f"TRACEABILITY LOG ({len(entries)} events)\n"]
+    for entry in entries:
+        ts = entry.get("timestamp", "?")[:19].replace("T", " ")
+        event_type = entry.get("event_type", "?")
+        agent = entry.get("agent", "")
+        action = entry.get("action", "")
+        stage = entry.get("stage", "")
+
+        icon = {
+            "agent_spawn": "→",
+            "agent_complete": "✓",
+            "stage_start": "▶",
+            "stage_end": "■",
+            "decision": "◆",
+            "reflection": "◈",
+            "validation": "✔",
+            "error": "✗",
+            "user_action": "●",
+        }.get(event_type, "·")
+
+        line = f"  {icon} [{ts}] {event_type}"
+        if agent:
+            line += f" | {agent}"
+        if stage:
+            line += f" | stage:{stage}"
+        if action:
+            line += f" — {action}"
+        lines.append(line)
+
+        if verbose:
+            if entry.get("inputs_summary"):
+                lines.append(f"      IN:  {entry['inputs_summary']}")
+            if entry.get("outputs_summary"):
+                lines.append(f"      OUT: {entry['outputs_summary']}")
+            if entry.get("duration_ms"):
+                lines.append(f"      Duration: {entry['duration_ms']}ms")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# 14. BUSINESS PLAUSIBILITY CHECKS
+# =============================================================================
+
+DEFAULT_PLAUSIBILITY_RULES = {
+    "coefficient_sign": {
+        "description": "Check that model coefficients have expected signs",
+        "enabled": True,
+    },
+    "prediction_range": {
+        "description": "Check predictions fall within plausible domain range",
+        "enabled": True,
+    },
+    "effect_size": {
+        "description": "Check ROAS/effect sizes are within plausible bounds",
+        "enabled": True,
+        "roas_min": 0.1,
+        "roas_max": 50.0,
+    },
+    "feature_importance_sanity": {
+        "description": "Check top features match domain expectations",
+        "enabled": True,
+    },
+    "prediction_distribution": {
+        "description": "Check prediction distribution is not degenerate",
+        "enabled": True,
+        "min_unique_ratio": 0.01,
+    },
+}
+
+
+def validate_business_plausibility(context, config=None):
+    """
+    Run business plausibility checks on model outputs.
+
+    Args:
+        context: Dict with available keys:
+            - model: Fitted model object
+            - X_test: Test features DataFrame
+            - y_test: Test target Series
+            - y_pred: Predictions array
+            - feature_names: List of feature names
+            - feature_importances: Dict of feature_name -> importance
+            - task_type: 'classification' | 'regression' | 'mmm'
+            - domain_expectations: Dict with domain-specific rules:
+                - expected_positive_features: list
+                - expected_negative_features: list
+                - target_min: minimum plausible target value
+                - target_max: maximum plausible target value
+                - top_features_expected: list of features expected to be important
+            - roas_values: Dict of channel -> ROAS (for MMM)
+
+        config: Optional plausibility rules config dict
+
+    Returns:
+        dict: passed (bool), checks (list), summary (str), critical_failures (int)
+    """
+    import numpy as np
+
+    if config is None:
+        config = _load_plausibility_config()
+
+    checks = []
+    critical_failures = 0
+
+    # --- Check 1: Coefficient sign plausibility ---
+    if config.get("coefficient_sign", {}).get("enabled", True):
+        model = context.get("model")
+        domain = context.get("domain_expectations", {})
+        pos_features = domain.get("expected_positive_features", [])
+        neg_features = domain.get("expected_negative_features", [])
+
+        if model and hasattr(model, "coef_") and (pos_features or neg_features):
+            feature_names = context.get("feature_names", [])
+            coefs = model.coef_.flatten() if hasattr(model.coef_, "flatten") else model.coef_
+            coef_dict = dict(zip(feature_names, coefs)) if len(feature_names) == len(coefs) else {}
+
+            violations = []
+            for feat in pos_features:
+                if feat in coef_dict and coef_dict[feat] < 0:
+                    violations.append(f"{feat} expected positive, got {coef_dict[feat]:.4f}")
+            for feat in neg_features:
+                if feat in coef_dict and coef_dict[feat] > 0:
+                    violations.append(f"{feat} expected negative, got {coef_dict[feat]:.4f}")
+
+            check = {
+                "name": "coefficient_sign",
+                "passed": len(violations) == 0,
+                "severity": "high",
+                "details": violations if violations else "All coefficient signs match expectations",
+            }
+            checks.append(check)
+            if not check["passed"]:
+                critical_failures += 1
+        else:
+            checks.append({
+                "name": "coefficient_sign",
+                "passed": True,
+                "severity": "info",
+                "details": "Skipped — no linear model or no domain expectations provided",
+            })
+
+    # --- Check 2: Prediction range plausibility ---
+    if config.get("prediction_range", {}).get("enabled", True):
+        y_pred = context.get("y_pred")
+        domain = context.get("domain_expectations", {})
+        target_min = domain.get("target_min")
+        target_max = domain.get("target_max")
+
+        if y_pred is not None and (target_min is not None or target_max is not None):
+            pred_arr = np.asarray(y_pred)
+            violations = []
+            if target_min is not None and pred_arr.min() < target_min:
+                violations.append(f"Min prediction {pred_arr.min():.4f} < domain min {target_min}")
+            if target_max is not None and pred_arr.max() > target_max:
+                violations.append(f"Max prediction {pred_arr.max():.4f} > domain max {target_max}")
+
+            pct_out = 0
+            if target_min is not None and target_max is not None:
+                out_of_range = ((pred_arr < target_min) | (pred_arr > target_max)).sum()
+                pct_out = out_of_range / len(pred_arr) * 100
+
+            check = {
+                "name": "prediction_range",
+                "passed": len(violations) == 0,
+                "severity": "high" if pct_out > 10 else "medium",
+                "details": violations if violations else "All predictions within expected range",
+                "pct_out_of_range": round(pct_out, 2),
+            }
+            checks.append(check)
+            if not check["passed"] and check["severity"] == "high":
+                critical_failures += 1
+        else:
+            checks.append({
+                "name": "prediction_range",
+                "passed": True,
+                "severity": "info",
+                "details": "Skipped — no predictions or domain bounds provided",
+            })
+
+    # --- Check 3: ROAS/Effect size plausibility ---
+    if config.get("effect_size", {}).get("enabled", True):
+        roas_values = context.get("roas_values", {})
+        roas_min = config.get("effect_size", {}).get("roas_min", 0.1)
+        roas_max = config.get("effect_size", {}).get("roas_max", 50.0)
+
+        if roas_values:
+            violations = []
+            for channel, roas in roas_values.items():
+                if roas < roas_min:
+                    violations.append(f"{channel}: ROAS {roas:.2f} < min {roas_min}")
+                elif roas > roas_max:
+                    violations.append(f"{channel}: ROAS {roas:.2f} > max {roas_max} (suspiciously high)")
+
+            check = {
+                "name": "effect_size",
+                "passed": len(violations) == 0,
+                "severity": "high",
+                "details": violations if violations else f"All ROAS values within [{roas_min}, {roas_max}]",
+            }
+            checks.append(check)
+            if not check["passed"]:
+                critical_failures += 1
+        else:
+            checks.append({
+                "name": "effect_size",
+                "passed": True,
+                "severity": "info",
+                "details": "Skipped — no ROAS values provided",
+            })
+
+    # --- Check 4: Feature importance sanity ---
+    if config.get("feature_importance_sanity", {}).get("enabled", True):
+        importances = context.get("feature_importances", {})
+        domain = context.get("domain_expectations", {})
+        expected_top = domain.get("top_features_expected", [])
+
+        if importances and expected_top:
+            sorted_features = sorted(importances.items(), key=lambda x: abs(x[1]), reverse=True)
+            actual_top = [f[0] for f in sorted_features[:len(expected_top) * 2]]
+            missing = [f for f in expected_top if f not in actual_top]
+
+            check = {
+                "name": "feature_importance_sanity",
+                "passed": len(missing) == 0,
+                "severity": "medium",
+                "details": f"Expected important features not in top: {missing}" if missing
+                    else "Top features match domain expectations",
+                "actual_top_features": actual_top[:10],
+            }
+            checks.append(check)
+        else:
+            checks.append({
+                "name": "feature_importance_sanity",
+                "passed": True,
+                "severity": "info",
+                "details": "Skipped — no importances or expected features provided",
+            })
+
+    # --- Check 5: Prediction distribution sanity ---
+    if config.get("prediction_distribution", {}).get("enabled", True):
+        y_pred = context.get("y_pred")
+        min_unique_ratio = config.get("prediction_distribution", {}).get("min_unique_ratio", 0.01)
+
+        if y_pred is not None:
+            pred_arr = np.asarray(y_pred)
+            n_unique = len(np.unique(pred_arr))
+            unique_ratio = n_unique / len(pred_arr) if len(pred_arr) > 0 else 0
+
+            issues = []
+            if n_unique == 1:
+                issues.append("Degenerate predictions — model outputs a single constant value")
+            elif unique_ratio < min_unique_ratio and context.get("task_type") != "classification":
+                issues.append(f"Very low prediction diversity: {n_unique} unique values out of {len(pred_arr)}")
+
+            check = {
+                "name": "prediction_distribution",
+                "passed": len(issues) == 0,
+                "severity": "high" if n_unique == 1 else "medium",
+                "details": issues if issues else "Prediction distribution looks reasonable",
+                "n_unique_predictions": n_unique,
+            }
+            checks.append(check)
+            if not check["passed"] and check["severity"] == "high":
+                critical_failures += 1
+
+    # Build summary
+    passed_count = sum(1 for c in checks if c["passed"])
+    total = len(checks)
+    failed = [c for c in checks if not c["passed"]]
+
+    summary_lines = [f"Plausibility: {passed_count}/{total} checks passed"]
+    for f in failed:
+        summary_lines.append(f"  FAIL [{f['severity']}] {f['name']}: {f['details']}")
+
+    return {
+        "passed": critical_failures == 0,
+        "checks": checks,
+        "summary": "\n".join(summary_lines),
+        "critical_failures": critical_failures,
+    }
+
+
+def _load_plausibility_config(search_dirs=None):
+    """Load plausibility config from project or return defaults."""
+    if search_dirs is None:
+        search_dirs = PLATFORM_REPORT_DIRS
+
+    for d in search_dirs:
+        config_path = os.path.join(os.path.dirname(d), "plausibility_config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path) as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return DEFAULT_PLAUSIBILITY_RULES
+
+
+def save_plausibility_report(result, output_dirs=None):
+    """Save plausibility check results as an agent report."""
+    report_data = {
+        "status": "completed",
+        "findings": {
+            "summary": result["summary"],
+            "details": {
+                "passed": result["passed"],
+                "checks": result["checks"],
+                "critical_failures": result["critical_failures"],
+            },
+        },
+        "recommendations": [
+            {
+                "action": f"Review failed check: {c['name']} — {c['details']}",
+                "target_agent": "ml-theory-advisor",
+                "priority": c["severity"],
+            }
+            for c in result["checks"] if not c["passed"]
+        ],
+        "next_steps": ["Review failed checks with domain expert"] if not result["passed"] else [],
+        "artifacts": [],
+    }
+    return save_agent_report("plausibility-validator", report_data, output_dirs)
+
+
+# =============================================================================
+# 15. DATABASE CONNECTORS
+# =============================================================================
+
+def load_data_from_db(connection_string, query, **kwargs):
+    """
+    Load data from a database into a DataFrame.
+
+    Supports Snowflake, PostgreSQL, BigQuery, and any SQLAlchemy-compatible database.
+
+    Args:
+        connection_string: Database URI string or dict with connection params.
+            - Snowflake: 'snowflake://user:pass@account/db/schema?warehouse=WH'
+            - PostgreSQL: 'postgresql://user:pass@host:port/db'
+            - BigQuery: 'bigquery://project/dataset'
+            - Dict: {type: 'snowflake'|'bigquery'|'postgresql', ...connection params}
+        query: SQL query string or table name
+        **kwargs: Additional arguments passed to pd.read_sql()
+
+    Returns:
+        pandas DataFrame
+    """
+    if isinstance(connection_string, dict):
+        return _load_from_db_config(connection_string, query, **kwargs)
+
+    conn_lower = connection_string.lower()
+
+    if conn_lower.startswith("snowflake://"):
+        return _load_from_snowflake_uri(connection_string, query, **kwargs)
+    elif conn_lower.startswith("bigquery://"):
+        return _load_from_bigquery_uri(connection_string, query, **kwargs)
+    else:
+        return _load_from_sqlalchemy(connection_string, query, **kwargs)
+
+
+def _load_from_db_config(config, query, **kwargs):
+    """Load data using a config dict with explicit type field."""
+    db_type = config.get("type", "").lower()
+
+    if db_type == "snowflake":
+        account = config.get("account", os.environ.get("SNOWFLAKE_ACCOUNT", ""))
+        user = config.get("user", os.environ.get("SNOWFLAKE_USER", ""))
+        password = config.get("password", os.environ.get("SNOWFLAKE_PASSWORD", ""))
+        database = config.get("database", os.environ.get("SNOWFLAKE_DATABASE", ""))
+        schema = config.get("schema", os.environ.get("SNOWFLAKE_SCHEMA", ""))
+        warehouse = config.get("warehouse", os.environ.get("SNOWFLAKE_WAREHOUSE", ""))
+        uri = f"snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}"
+        return _load_from_snowflake_uri(uri, query, **kwargs)
+
+    elif db_type == "bigquery":
+        project = config.get("project", os.environ.get("BIGQUERY_PROJECT", ""))
+        credentials_path = config.get("credentials_path", os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", ""))
+        if credentials_path:
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+        uri = f"bigquery://{project}"
+        return _load_from_bigquery_uri(uri, query, **kwargs)
+
+    elif db_type in ("postgresql", "postgres", "pg"):
+        host = config.get("host", os.environ.get("PGHOST", "localhost"))
+        port = config.get("port", os.environ.get("PGPORT", "5432"))
+        user = config.get("user", os.environ.get("PGUSER", ""))
+        password = config.get("password", os.environ.get("PGPASSWORD", ""))
+        database = config.get("database", os.environ.get("PGDATABASE", ""))
+        uri = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+        return _load_from_sqlalchemy(uri, query, **kwargs)
+
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}. Use 'snowflake', 'bigquery', or 'postgresql'.")
+
+
+def _load_from_snowflake_uri(uri, query, **kwargs):
+    """Load data from Snowflake using snowflake-sqlalchemy."""
+    try:
+        from sqlalchemy import create_engine
+    except ImportError:
+        raise ImportError("Install sqlalchemy and snowflake-sqlalchemy: pip install sqlalchemy snowflake-sqlalchemy")
+
+    engine = create_engine(uri)
+    try:
+        return pd.read_sql(query, engine, **kwargs)
+    finally:
+        engine.dispose()
+
+
+def _load_from_bigquery_uri(uri, query, **kwargs):
+    """Load data from BigQuery."""
+    try:
+        import pandas_gbq
+    except ImportError:
+        raise ImportError("Install pandas-gbq: pip install pandas-gbq")
+
+    project = uri.replace("bigquery://", "").split("/")[0]
+    return pandas_gbq.read_gbq(query, project_id=project, **kwargs)
+
+
+def _load_from_sqlalchemy(uri, query, **kwargs):
+    """Load data using SQLAlchemy (PostgreSQL, MySQL, SQLite, etc.)."""
+    try:
+        from sqlalchemy import create_engine
+    except ImportError:
+        raise ImportError("Install sqlalchemy: pip install sqlalchemy")
+
+    engine = create_engine(uri)
+    try:
+        return pd.read_sql(query, engine, **kwargs)
+    finally:
+        engine.dispose()
